@@ -1,0 +1,72 @@
+name: Mise a jour de la blocklist Nexium
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Agreger les sources
+        run: |
+          node -e '
+          const fs=require("fs"),https=require("https");
+          const SOURCES=[
+            "https://raw.githubusercontent.com/Discord-AntiScam/scam-links/main/list.txt",
+            "https://raw.githubusercontent.com/nikolaischunk/discord-phishing-links/main/txt/domain-list.txt",
+            "https://raw.githubusercontent.com/nikolaischunk/discord-phishing-links/main/txt/suspicious-list.txt",
+            "https://raw.githubusercontent.com/Dogino/Discord-Phishing-URLs/main/scam-urls.txt"
+          ];
+          function get(u){return new Promise(r=>{https.get(u,{headers:{"User-Agent":"nexium-blocklist"}},s=>{
+            if(s.statusCode!==200){s.resume();console.log("  ! "+s.statusCode+" "+u);return r("");}
+            let d="";s.setEncoding("utf8");s.on("data",c=>d+=c);s.on("end",()=>r(d));}).on("error",e=>{console.log("  ! "+e.message);r("");});});}
+          function norm(L){L=L.trim().toLowerCase();
+            if(!L||"#;!".indexOf(L[0])>=0)return null;
+            if(L.startsWith("||"))L=L.slice(2).split("^")[0];
+            else if(/^(0\.0\.0\.0|127\.0\.0\.1)\s+/.test(L))L=L.replace(/^\S+\s+/,"");
+            L=L.replace(/^https?:\/\//,"").replace(/^www\./,"").split("/")[0].split(":")[0].trim();
+            if(!L||L.length>120||L.indexOf(".")<=0)return null;
+            if(/[^a-z0-9.\-_]/.test(L))return null;
+            return L;}
+          function read(f){try{return fs.readFileSync(f,"utf8");}catch(_){return "";}}
+          (async()=>{
+            const set=new Set();
+            // 1) tes ajouts manuels (jamais ecrases)
+            for(const l of read("manual.txt").split(/\r?\n/)){const d=norm(l);if(d)set.add(d);}
+            const mine=set.size; console.log("manual.txt : "+mine);
+            // 2) sources communautaires
+            for(const u of SOURCES){const txt=await get(u);let n=0;
+              for(const l of txt.split(/\r?\n/)){const d=norm(l);if(d&&!set.has(d)){set.add(d);n++;}}
+              console.log("+ "+n+" depuis "+u.split("/")[4]);}
+            // 3) retirer les domaines de confiance
+            const allow=new Set();
+            for(const l of read("allowlist.txt").split(/\r?\n/)){const d=norm(l);if(d)allow.add(d);}
+            let removed=0;
+            for(const d of Array.from(set)){
+              let p=d,hit=false,g=0;
+              while(p&&g<8){if(allow.has(p)){hit=true;break;}const k=p.indexOf(".");if(k<0)break;p=p.slice(k+1);g++;}
+              if(hit){set.delete(d);removed++;}}
+            const out=Array.from(set).sort();
+            fs.writeFileSync("blocklist.txt",out.join("\n")+"\n");
+            console.log("\nTOTAL : "+out.length+" domaines uniques ("+removed+" retires par allowlist)");
+          })();
+          '
+
+      - name: Publier si change
+        run: |
+          if git diff --quiet blocklist.txt; then
+            echo "aucun changement"
+          else
+            git config user.name "nexium-bot"
+            git config user.email "bot@users.noreply.github.com"
+            git add blocklist.txt
+            git commit -m "blocklist: $(wc -l < blocklist.txt) domaines"
+            git push
+          fi
