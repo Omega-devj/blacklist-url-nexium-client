@@ -22,7 +22,8 @@ jobs:
             "https://raw.githubusercontent.com/Discord-AntiScam/scam-links/main/list.txt",
             "https://raw.githubusercontent.com/nikolaischunk/discord-phishing-links/main/txt/domain-list.txt",
             "https://raw.githubusercontent.com/nikolaischunk/discord-phishing-links/main/txt/suspicious-list.txt",
-            "https://raw.githubusercontent.com/Dogino/Discord-Phishing-URLs/main/scam-urls.txt"
+            "https://raw.githubusercontent.com/Dogino/Discord-Phishing-URLs/main/scam-urls.txt",
+            https://raw.githubusercontent.com/Phishing-Database/Phishing.Database/refs/heads/master/phishing-links-ACTIVE/phishing-links-ACTIVE1.txt
           ];
           function get(u){return new Promise(r=>{https.get(u,{headers:{"User-Agent":"nexium-blocklist"}},s=>{
             if(s.statusCode!==200){s.resume();console.log("  ! "+s.statusCode+" "+u);return r("");}
